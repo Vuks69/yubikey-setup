@@ -134,6 +134,74 @@ line manually to ``/etc/pam.d/sudo`` or ``system-auth``:
 
    auth sufficient pam_u2f.so cue authfile=/home/USER/.config/Yubico/u2f_keys
 
+**Step 6 - Unlock LUKS at boot with the YubiKeys (FIDO2)**
+
+Unlike PAM, this uses the FIDO2 ``hmac-secret`` extension through
+``systemd-cryptenroll``. Each YubiKey gets its **own** keyslot and token in
+the LUKS2 header. Requires LUKS2 and a FIDO2 PIN on each key.
+
+Back up the header first, and keep the backup encrypted **off** the disk
+you are encrypting:
+
+.. code:: bash
+
+   sudo cryptsetup luksDump <LUKS-DEVICE>   # must report Version: 2
+   sudo cryptsetup luksHeaderBackup <LUKS-DEVICE> \
+     --header-backup-file /path/to/encrypted-backup/luks-header.img
+
+   # Optional: add a high-entropy passphrase slot as a fallback
+   sudo systemd-cryptenroll --recovery-key <LUKS-DEVICE>
+
+Enroll each key separately — ``auto`` requires exactly one token plugged
+in. Each enrollment prompts for the existing LUKS passphrase, then the
+FIDO2 PIN and touch:
+
+.. code:: bash
+
+   # YubiKey A inserted
+   sudo systemd-cryptenroll --fido2-device=auto <LUKS-DEVICE>
+
+   # Unplug A, insert YubiKey B
+   sudo systemd-cryptenroll --fido2-device=auto <LUKS-DEVICE>
+
+   # Verify: original passphrase slot + two systemd-fido2 tokens remain
+   sudo cryptsetup luksDump <LUKS-DEVICE>
+
+Use ``--fido2-device=list`` if ``auto`` cannot find the key. Defaults
+require PIN + touch and store the parameters in the LUKS2 header; keep
+those defaults.
+
+Enable FIDO2 unlock at boot. On Fedora/RHEL with an existing
+``/etc/crypttab``, append ``fido2-device=auto`` to the LUKS entry's
+options field — do **not** add the PAM-style ``auth`` line here:
+
+.. code:: bash
+
+   sudo cp -a /etc/crypttab /etc/crypttab.bak-fido2
+   sudo edit /etc/crypttab
+
+.. code:: text
+
+   luks-<LUKS-UUID> UUID=<LUKS-UUID> none discard,fido2-device=auto
+
+.. code:: bash
+
+   sudo dracut -f   # update-initramfs -u on Debian/Ubuntu
+   lsinitrd /boot/initramfs-$(uname -r).img -f etc/crypttab
+
+If the volume is unlocked via ``rd.luks.uuid=`` on the kernel cmdline
+instead of a crypttab entry, add ``rd.luks.options=fido2-device=auto`` to
+the cmdline rather than editing crypttab.
+
+**Test before removing anything:** reboot and unlock with A (PIN + tap),
+then with B, then with the passphrase while no key is inserted. Keep the
+original passphrase slot as your fallback. If a key is lost, wipe only
+that key's slot — never wipe all slots:
+
+.. code:: bash
+
+   sudo systemd-cryptenroll --wipe-slot=<SLOT> <LUKS-DEVICE>
+
 3b. Recovery After Losing Device A
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
