@@ -112,8 +112,27 @@ Register both keys.
    pamu2fcfg -n >> ~/.config/Yubico/u2f_keys
    # Insert YubiKey B, tap it
 
-   # Enable PAM module (add to /etc/pam.d/sudo or similar)
-   # auth required pam_u2f.so authfile=/home/USER/.config/Yubico/u2f_keys
+On Fedora/RHEL, use ``authselect`` rather than editing ``/etc/pam.d`` by
+hand. The ``with-pam-u2f`` feature adds ``auth sufficient pam_u2f.so cue``
+to ``system-auth`` and ``password-auth`` — the YubiKey becomes an extra
+option, so password login still works. Reuse the current profile and
+features (check with ``authselect current``):
+
+.. code:: bash
+
+   sudo authselect select local with-silent-lastlog with-fingerprint with-mdns4 with-pam-u2f --force
+
+   # Verify
+   grep pam_u2f /etc/pam.d/system-auth
+
+``with-pam-u2f-2fa`` makes the key *required* as a second factor instead.
+Avoid ``without-pam-u2f-nouserok`` unless every account (including root)
+can authenticate. On systems without authselect, add the ``sufficient``
+line manually to ``/etc/pam.d/sudo`` or ``system-auth``:
+
+.. code:: bash
+
+   auth sufficient pam_u2f.so cue authfile=/home/USER/.config/Yubico/u2f_keys
 
 3b. Recovery After Losing Device A
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
