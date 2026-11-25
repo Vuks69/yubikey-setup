@@ -5,12 +5,12 @@ Yubico OTP
 -------------
 
 Yubico OTP is the original YubiKey application. It provides two
-keyboard-emulation “slots” (slot 1 triggered by a short touch, slot 2 by
+keyboard-emulation "slots" (slot 1 triggered by a short touch, slot 2 by
 a long touch) that output a one-time password or static string as USB
 keyboard scancodes.
 
 1a. What It Is Used For
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **Yubico OTP credential** - a 44-character one-time password validated
   against Yubico's cloud validation service (or a self-hosted server).
@@ -51,60 +51,58 @@ keyboard scancodes.
 |                       |                       | PKI. Can coexist.     |
 +-----------------------+-----------------------+-----------------------+
 
-3. Setup for Two-Device Use Case
+3. Setup for the Two-Device Case
 --------------------------------
 
 Both YubiKeys (A = daily, B = backup) should share identical slot
 credentials so B can replace A seamlessly if lost.
 
 3a. Full Setup From Scratch
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Step 1 - Generate credential files for Yubico OTP (slot 1)**
 
 .. code:: bash
 
-   # Generate and write credential to slot 1, saving the config to a file
-   ykman otp yubiotp 1 --serial-public-id --generate-private-id --generate-key \
-     --config-output /path/to/backup/yubico-otp-slot1.txt
+    # Generate and write the slot-1 credential to YubiKey A, saving config
+    ykman otp yubiotp 1 --serial-public-id --generate-private-id --generate-key \
+      --config-output /path/to/backup/yubico-otp-A-slot1.txt
 
-Repeat for the **other** YubiKey (B):
-
-.. code:: bash
-
-   ykman otp yubiotp 1 --serial-public-id --generate-private-id --generate-key \
-     --config-output /path/to/backup/yubico-otp-slot1.txt
+    # Repeat for YubiKey B with a *different* backup path, so B does not
+    # overwrite A's credential file
+    ykman -d <B-SERIAL> otp yubiotp 1 --serial-public-id --generate-private-id --generate-key \
+      --config-output /path/to/backup/yubico-otp-B-slot1.txt
 
 - Each YubiKey gets its *own* unique credential (different private ID &
   key).
-- Save the output file securely (e.g., encrypted backup).
+- Save each output file securely (e.g., encrypted backup).
 - ``--serial-public-id`` uses the YubiKey serial as the public ID so the
   validation server can distinguish the two keys even though they'd both
   be registered to your account.
 
-**Register both public IDs with your Yubico account** at
+Register both public IDs with your Yubico account at
 https://upgrade.yubico.com or your self-hosted validation server.
 
 **Step 2 - Challenge-response (slot 2) for local auth**
 
 Generate a random 20-byte HMAC-SHA1 key on both keys (identical key so
-both give same response):
+both give the same response):
 
 .. code:: bash
 
-   # Generate key ONCE, write it down securely
-   KEY=$(openssl rand -hex 20)
+    # Generate key ONCE, write it down securely
+    KEY=$(openssl rand -hex 20)
 
-   # Program both YubiKeys with the SAME key
-   ykman otp chalresp 2 $KEY
-   ykman -d <B-SERIAL> otp chalresp 2 $KEY
+    # Program both YubiKeys with the SAME key
+    ykman otp chalresp 2 $KEY
+    ykman -d <B-SERIAL> otp chalresp 2 $KEY
 
 Or generate per-key (unique keys):
 
 .. code:: bash
 
-   ykman otp chalresp 2 --generate
-   ykman -d <B-SERIAL> otp chalresp 2 --generate
+    ykman otp chalresp 2 --generate
+    ykman -d <B-SERIAL> otp chalresp 2 --generate
 
 **Step 3 - Set access codes (optional)**
 
@@ -112,9 +110,9 @@ Prevent overwriting slots without a 6-byte hex access code:
 
 .. code:: bash
 
-   ACCESS_CODE=$(openssl rand -hex 6)
-   ykman otp --access-code $ACCESS_CODE settings 1 --new-access-code $ACCESS_CODE
-   ykman otp --access-code $ACCESS_CODE settings 2 --new-access-code $ACCESS_CODE
+    ACCESS_CODE=$(openssl rand -hex 6)
+    ykman otp --access-code $ACCESS_CODE settings 1 --new-access-code $ACCESS_CODE
+    ykman otp --access-code $ACCESS_CODE settings 2 --new-access-code $ACCESS_CODE
 
 Store the access code(s) in your encrypted backup.
 
@@ -122,14 +120,14 @@ Store the access code(s) in your encrypted backup.
 
 .. code:: bash
 
-   ykman otp info
-   # Both slots should show "programmed"
+    ykman otp info
+    # Both slots should show "programmed"
 
-   # Test challenge-response
-   ykman otp calculate 2 $(echo -n "test" | xxd -p)
+    # Test challenge-response
+    ykman otp calculate 2 $(echo -n "test" | xxd -p)
 
 3b. Recovery After Losing Device A
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Take YubiKey B from safe location.
 2. If B was already programmed identically (same challenge-response key,
@@ -148,7 +146,7 @@ Store the access code(s) in your encrypted backup.
    backups.
 
 3c. Revocation
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 - **Yubico OTP**: Log into your Yubico validation dashboard and revoke
   the lost device's public ID.
@@ -159,8 +157,19 @@ Store the access code(s) in your encrypted backup.
   changed (they're in the lost device), so services relying on it must
   be updated.
 
-Data to Back Up (Encrypted)
----------------------------
+3d. Notes
+~~~~~~~~~
+
+- **Yubico OTP is legacy.** Prefer FIDO, then OATH, for new 2FA. OTP
+  exists mainly for legacy services and local challenge-response auth.
+- **Static password** is emitted to *any* field it taps — treat it like
+  a master password, and only use it as a prefix or for password-manager
+  entry.
+- **NDEF** means tapping the key opens a URI or pastes text; convenient,
+  but the NDEF payload is not encrypted.
+
+4. Backup
+---------
 
 - Yubico OTP private ID & key for each slot on each key
 - Challenge-response keys (if shared)

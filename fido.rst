@@ -17,7 +17,7 @@ Both live in the same application space on the YubiKey. Resetting one
 resets the other.
 
 1a. What It Is Used For
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **Second-factor (U2F / 2FA)** - tap to approve login after password.
 - **Passwordless (FIDO2 resident keys)** - the private key is stored on
@@ -52,7 +52,7 @@ resets the other.
 |                       |                       | only correct way.     |
 +-----------------------+-----------------------+-----------------------+
 
-3. Setup for Two-Device Use Case
+3. Setup for the Two-Device Case
 --------------------------------
 
 FIDO is inherently multi-device friendly: you register each YubiKey
@@ -60,26 +60,26 @@ independently with every service that supports it. No keys are shared
 between devices.
 
 3a. Full Setup From Scratch
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Step 1 - Set a FIDO2 PIN (same on both keys)**
+**Step 1 - Configure PIN length (optional)**
 
 .. code:: bash
 
-   ykman fido access change-pin
-   # Enter current PIN (default: none on new key — just press Enter)
-   # Enter new PIN (4+ chars, min length configurable)
+    ykman fido access set-min-length 8
+
+Both keys should match.
+
+**Step 2 - Set a FIDO2 PIN (same on both keys)**
+
+.. code:: bash
+
+    ykman fido access change-pin
+    # Enter current PIN (default: none on new key — just press Enter)
+    # Enter new PIN (4+ chars, min length configurable)
 
 Repeat on both YubiKeys. Use the **same PIN** for convenience so muscle
 memory works on the backup.
-
-**Step 2 - Configure PIN length (optional)**
-
-.. code:: bash
-
-   ykman fido access set-min-length 8
-
-Both keys should match.
 
 **Step 3 - Register with services**
 
@@ -96,21 +96,23 @@ every service.
 
 **Step 4 - Set up passwordless login (optional)**
 
-Services supporting passkeys/resident keys: - Follow the service's
-passkey registration flow. - The YubiKey will prompt for PIN + touch. -
-Register both keys.
+Services supporting passkeys/resident keys:
+
+- Follow the service's passkey registration flow.
+- The YubiKey will prompt for PIN + touch.
+- Register both keys.
 
 **Step 5 - Set up local sudo/login (Linux) with pam-u2f**
 
 .. code:: bash
 
-   # Install pam-u2f + pamu2fcfg (package name varies: libpam-u2f, pam-u2f, etc.)
+    # Install pam-u2f + pamu2fcfg (package name varies: libpam-u2f, pam-u2f, etc.)
 
-   # Add both keys to the authfile
-   pamu2fcfg > ~/.config/Yubico/u2f_keys
-   # Tap YubiKey A
-   pamu2fcfg -n >> ~/.config/Yubico/u2f_keys
-   # Insert YubiKey B, tap it
+    # Add both keys to the authfile
+    pamu2fcfg > ~/.config/Yubico/u2f_keys
+    # Tap YubiKey A
+    pamu2fcfg -n >> ~/.config/Yubico/u2f_keys
+    # Insert YubiKey B, tap it
 
 On Fedora/RHEL, use ``authselect`` rather than editing ``/etc/pam.d`` by
 hand. The ``with-pam-u2f`` feature adds ``auth sufficient pam_u2f.so cue``
@@ -120,10 +122,10 @@ features (check with ``authselect current``):
 
 .. code:: bash
 
-   sudo authselect select local with-silent-lastlog with-fingerprint with-mdns4 with-pam-u2f --force
+    sudo authselect select local with-silent-lastlog with-fingerprint with-mdns4 with-pam-u2f --force
 
-   # Verify
-   grep pam_u2f /etc/pam.d/system-auth
+    # Verify
+    grep pam_u2f /etc/pam.d/system-auth
 
 ``with-pam-u2f-2fa`` makes the key *required* as a second factor instead.
 Avoid ``without-pam-u2f-nouserok`` unless every account (including root)
@@ -132,25 +134,25 @@ line manually to ``/etc/pam.d/sudo`` or ``system-auth``:
 
 .. code:: bash
 
-   auth sufficient pam_u2f.so cue authfile=/home/USER/.config/Yubico/u2f_keys
+    auth sufficient pam_u2f.so cue authfile=/home/USER/.config/Yubico/u2f_keys
 
 **Step 6 - Unlock LUKS at boot with the YubiKeys (FIDO2)**
 
 Unlike PAM, this uses the FIDO2 ``hmac-secret`` extension through
-``systemd-cryptenroll``. Each YubiKey gets its **own** keyslot and token in
-the LUKS2 header. Requires LUKS2 and a FIDO2 PIN on each key.
+``systemd-cryptenroll``. Each YubiKey gets its **own** keyslot and token
+in the LUKS2 header. Requires LUKS2 and a FIDO2 PIN on each key.
 
 Back up the header first, and keep the backup encrypted **off** the disk
 you are encrypting:
 
 .. code:: bash
 
-   sudo cryptsetup luksDump <LUKS-DEVICE>   # must report Version: 2
-   sudo cryptsetup luksHeaderBackup <LUKS-DEVICE> \
-     --header-backup-file /path/to/encrypted-backup/luks-header.img
+    sudo cryptsetup luksDump <LUKS-DEVICE>   # must report Version: 2
+    sudo cryptsetup luksHeaderBackup <LUKS-DEVICE> \
+      --header-backup-file /path/to/encrypted-backup/luks-header.img
 
-   # Optional: add a high-entropy passphrase slot as a fallback
-   sudo systemd-cryptenroll --recovery-key <LUKS-DEVICE>
+    # Optional: add a high-entropy passphrase slot as a fallback
+    sudo systemd-cryptenroll --recovery-key <LUKS-DEVICE>
 
 Enroll each key separately — ``auto`` requires exactly one token plugged
 in. Each enrollment prompts for the existing LUKS passphrase, then the
@@ -158,14 +160,14 @@ FIDO2 PIN and touch:
 
 .. code:: bash
 
-   # YubiKey A inserted
-   sudo systemd-cryptenroll --fido2-device=auto <LUKS-DEVICE>
+    # YubiKey A inserted
+    sudo systemd-cryptenroll --fido2-device=auto <LUKS-DEVICE>
 
-   # Unplug A, insert YubiKey B
-   sudo systemd-cryptenroll --fido2-device=auto <LUKS-DEVICE>
+    # Unplug A, insert YubiKey B
+    sudo systemd-cryptenroll --fido2-device=auto <LUKS-DEVICE>
 
-   # Verify: original passphrase slot + two systemd-fido2 tokens remain
-   sudo cryptsetup luksDump <LUKS-DEVICE>
+    # Verify: original passphrase slot + two systemd-fido2 tokens remain
+    sudo cryptsetup luksDump <LUKS-DEVICE>
 
 Use ``--fido2-device=list`` if ``auto`` cannot find the key. Defaults
 require PIN + touch and store the parameters in the LUKS2 header; keep
@@ -177,17 +179,17 @@ options field — do **not** add the PAM-style ``auth`` line here:
 
 .. code:: bash
 
-   sudo cp -a /etc/crypttab /etc/crypttab.bak-fido2
-   sudo edit /etc/crypttab
+    sudo cp -a /etc/crypttab /etc/crypttab.bak-fido2
+    sudo edit /etc/crypttab
 
 .. code:: text
 
-   luks-<LUKS-UUID> UUID=<LUKS-UUID> none discard,fido2-device=auto
+    luks-<LUKS-UUID> UUID=<LUKS-UUID> none discard,fido2-device=auto
 
 .. code:: bash
 
-   sudo dracut -f   # update-initramfs -u on Debian/Ubuntu
-   lsinitrd /boot/initramfs-$(uname -r).img -f etc/crypttab
+    sudo dracut -f   # update-initramfs -u on Debian/Ubuntu
+    lsinitrd /boot/initramfs-$(uname -r).img -f etc/crypttab
 
 If the volume is unlocked via ``rd.luks.uuid=`` on the kernel cmdline
 instead of a crypttab entry, add ``rd.luks.options=fido2-device=auto`` to
@@ -200,10 +202,10 @@ that key's slot — never wipe all slots:
 
 .. code:: bash
 
-   sudo systemd-cryptenroll --wipe-slot=<SLOT> <LUKS-DEVICE>
+    sudo systemd-cryptenroll --wipe-slot=<SLOT> <LUKS-DEVICE>
 
 3b. Recovery After Losing Device A
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 FIDO recovery is the hardest — this is a known pain point of hardware
 security keys.
@@ -222,11 +224,11 @@ security keys.
 3. **This is why you always register both keys.**
 
 **IMPORTANT**: FIDO credentials are **not exportable**. There is no
-“backup” for a FIDO private key. The only backup is having a second
+"backup" for a FIDO private key. The only backup is having a second
 physical key registered.
 
 3c. Revocation
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 - **Per-service**: Remove the lost key from each service's security
   settings.
@@ -235,9 +237,9 @@ physical key registered.
 
 .. code:: bash
 
-   # NOTE: Must be triggered immediately after inserting the YubiKey
-   #       and requires a touch confirmation
-   ykman fido reset
+    # NOTE: Must be triggered immediately after inserting the YubiKey
+    #       and requires a touch confirmation
+    ykman fido reset
 
 This deletes ALL FIDO credentials on that key and clears the PIN.
 
@@ -249,8 +251,8 @@ This deletes ALL FIDO credentials on that key and clears the PIN.
      ykman fido credentials list
      ykman fido credentials delete <CREDENTIAL_ID>
 
-Reserve Notes
--------------
+3d. Notes
+~~~~~~~~~
 
 - **PAM U2F** supports **multiple keys** in a single authfile. Run
   ``pamu2fcfg -n`` for each key and append to the same file.
@@ -258,6 +260,16 @@ Reserve Notes
   service, register both YubiKeys before walking away.
 - **Minimum PIN length**: Use ``ykman fido access set-min-length 8`` on
   both keys for consistency.
-- If a service shows “Security key already registered” when adding B,
+- If a service shows "Security key already registered" when adding B,
   you likely need to use a different slot/credential or the service may
   not support multiple keys — use TOTP/backup codes as fallback.
+
+4. Backup
+---------
+
+- **FIDO has no exportable backup.** The backup is the second registered
+  YubiKey — keep it registered at every service.
+- **FIDO2 PIN** (same on both keys) — store in an encrypted vault so the
+  backup key is ready to tap.
+- **LUKS / FIDO2 boot unlock** — the LUKS header backup and the
+  ``--recovery-key`` slot are your fallback if both keys are lost.

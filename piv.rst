@@ -26,7 +26,23 @@ the private key ever leaving the device.
 - **Wi-Fi authentication (EAP-TLS)** - enterprise network
   authentication.
 
-PIV Slots (common assignments):\n\n+----------+---------------------------+---------------+\n| Slot     | Usage                     | Key           |\n+==========+===========================+===============+\n| 9a       | Authentication            | PIN required  |\n+----------+---------------------------+---------------+\n| 9c       | Digital Signature         | PIN required  |\n+----------+---------------------------+---------------+\n| 9d       | Key Management            | PIN required  |\n|          | (encryption)              |               |\n+----------+---------------------------+---------------+\n| 9e       | Card Authentication       | No PIN (touch |\n|          |                           | only)         |\n+----------+---------------------------+---------------+\n| 82-95    | Retired / alternate keys  | Various       |\n+----------+---------------------------+---------------+
+**PIV slots** (common assignments):
+
++----------+---------------------------+---------------+
+| Slot     | Usage                     | Key           |
++==========+===========================+===============+
+| 9a       | Authentication            | PIN required  |
++----------+---------------------------+---------------+
+| 9c       | Digital Signature         | PIN required  |
++----------+---------------------------+---------------+
+| 9d       | Key Management            | PIN required  |
+|          | (encryption)              |               |
++----------+---------------------------+---------------+
+| 9e       | Card Authentication       | No PIN (touch |
+|          |                           | only)         |
++----------+---------------------------+---------------+
+| 82-95    | Retired / alternate keys  | Various       |
++----------+---------------------------+---------------+
 
 2. Overlaps / Conflicts
 -----------------------
@@ -54,7 +70,7 @@ PIV Slots (common assignments):\n\n+----------+---------------------------+-----
 |                       |                       | low-security.         |
 +-----------------------+-----------------------+-----------------------+
 
-3. Setup for Two-Device Use Case
+3. Setup for the Two-Device Case
 --------------------------------
 
 Each YubiKey should have its **own** private keys (they never leave the
@@ -63,13 +79,13 @@ same CA (or self-signed with the same subject) so the relying party
 trusts either key.
 
 3a. Full Setup From Scratch
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Step 1 - Reset PIV to factory defaults (new keys)**
 
 .. code:: bash
 
-   ykman piv reset
+    ykman piv reset
 
 **Step 2 - Change PIN and PUK from defaults**
 
@@ -77,11 +93,11 @@ Defaults: PIN=123456, PUK=12345678.
 
 .. code:: bash
 
-   # Change PIN
-   ykman piv access change-pin --pin 123456 --new-pin <NEW-PIN>
+    # Change PIN
+    ykman piv access change-pin --pin 123456 --new-pin <NEW-PIN>
 
-   # Change PUK
-   ykman piv access change-puk --puk 12345678 --new-puk <NEW-PUK>
+    # Change PUK
+    ykman piv access change-puk --puk 12345678 --new-puk <NEW-PUK>
 
 Use the **same PIN/PUK on both keys** for consistency.
 
@@ -91,18 +107,16 @@ Use a PIN-protected, YubiKey-stored management key (recommended):
 
 .. code:: bash
 
-   ykman piv access change-management-key --generate --protect
+    ykman piv access change-management-key --generate --protect
 
 This generates a random management key stored on the YubiKey, unlocked
-by the PIN.
-
-Repeat on both keys (each gets a unique random key).
+by the PIN. Repeat on both keys (each gets a unique random key).
 
 **Step 4 - Set retry counts**
 
 .. code:: bash
 
-   ykman piv access set-retries 5 5
+    ykman piv access set-retries 5 5
 
 The management key from Step 3 is used automatically when PIN-protected.
 
@@ -113,23 +127,22 @@ Add ``--pin-policy`` and ``--touch-policy`` flags to override defaults:
 
 .. code:: bash
 
-   # Example: Authentication key (slot 9a) with ECC P-256
-   ykman piv keys generate --algorithm ECCP256 9a pubkey-9a-A.pem
+    # Example: Authentication key (slot 9a) with ECC P-256
+    ykman piv keys generate --algorithm ECCP256 9a pubkey-9a-A.pem
 
-   # Example: Signature key (slot 9c) with ECC P-256
-   # Require PIN every time, cache touch for 15s
-   ykman piv keys generate --algorithm ECCP256 --pin-policy always --touch-policy cached 9c pubkey-9c-A.pem
+    # Example: Signature key (slot 9c) — require PIN every time, cache touch for 15s
+    ykman piv keys generate --algorithm ECCP256 --pin-policy always --touch-policy cached 9c pubkey-9c-A.pem
 
-   # Example: Encryption/Key Management key (slot 9d) with RSA 2048
-   ykman piv keys generate --algorithm RSA2048 9d pubkey-9d-A.pem
+    # Example: Encryption/Key Management key (slot 9d) with RSA 2048
+    ykman piv keys generate --algorithm RSA2048 9d pubkey-9d-A.pem
 
 Now do the same for YubiKey B, saving to different filenames:
 
 .. code:: bash
 
-   ykman -d <B-SERIAL> piv keys generate --algorithm ECCP256 9a pubkey-9a-B.pem
-   ykman -d <B-SERIAL> piv keys generate --algorithm ECCP256 --pin-policy always --touch-policy cached 9c pubkey-9c-B.pem
-   ykman -d <B-SERIAL> piv keys generate --algorithm RSA2048 9d pubkey-9d-B.pem
+    ykman -d <B-SERIAL> piv keys generate --algorithm ECCP256 9a pubkey-9a-B.pem
+    ykman -d <B-SERIAL> piv keys generate --algorithm ECCP256 --pin-policy always --touch-policy cached 9c pubkey-9c-B.pem
+    ykman -d <B-SERIAL> piv keys generate --algorithm RSA2048 9d pubkey-9d-B.pem
 
 **Step 6 - Card auth key (optional)**
 
@@ -138,7 +151,7 @@ Generate a low-security card auth key (slot 9e) for touch-only operations
 
 .. code:: bash
 
-   ykman piv keys generate --algorithm ECCP256 --pin-policy never --touch-policy always 9e pubkey-9e.pem
+    ykman piv keys generate --algorithm ECCP256 --pin-policy never --touch-policy always 9e pubkey-9e.pem
 
 **Step 7 - Generate self-signed certificates**
 
@@ -146,15 +159,15 @@ Create self-signed certificates for each slot on each key:
 
 .. code:: bash
 
-   # YubiKey A
-   ykman piv certificates generate --subject "CN=User Auth, O=YubiKey-A" 9a pubkey-9a-A.pem
-   ykman piv certificates generate --subject "CN=Digital Sig, O=YubiKey-A" 9c pubkey-9c-A.pem
-   ykman piv certificates generate --subject "CN=Key Mgmt, O=YubiKey-A" 9d pubkey-9d-A.pem
+    # YubiKey A
+    ykman piv certificates generate --subject "CN=User Auth, O=YubiKey-A" 9a pubkey-9a-A.pem
+    ykman piv certificates generate --subject "CN=Digital Sig, O=YubiKey-A" 9c pubkey-9c-A.pem
+    ykman piv certificates generate --subject "CN=Key Mgmt, O=YubiKey-A" 9d pubkey-9d-A.pem
 
-   # YubiKey B (note: same CN so services see equivalent certs)
-   ykman -d <B-SERIAL> piv certificates generate --subject "CN=User Auth, O=YubiKey-B" 9a pubkey-9a-B.pem
-   ykman -d <B-SERIAL> piv certificates generate --subject "CN=Digital Sig, O=YubiKey-B" 9c pubkey-9c-B.pem
-   ykman -d <B-SERIAL> piv certificates generate --subject "CN=Key Mgmt, O=YubiKey-B" 9d pubkey-9d-B.pem
+    # YubiKey B (note: same CN so services see equivalent certs)
+    ykman -d <B-SERIAL> piv certificates generate --subject "CN=User Auth, O=YubiKey-B" 9a pubkey-9a-B.pem
+    ykman -d <B-SERIAL> piv certificates generate --subject "CN=Digital Sig, O=YubiKey-B" 9c pubkey-9c-B.pem
+    ykman -d <B-SERIAL> piv certificates generate --subject "CN=Key Mgmt, O=YubiKey-B" 9d pubkey-9d-B.pem
 
 **Step 8 - Set up SSH authentication**
 
@@ -163,37 +176,37 @@ Convert the PEM public key to SSH format and add it to ``authorized_keys``:
 
 .. code:: bash
 
-   # Convert PEM to SSH one-line format and add to authorized_keys
-   ssh-keygen -i -m PKCS8 -f pubkey-9a-A.pem >> ~/.ssh/authorized_keys
+    # Convert PEM to SSH one-line format and add to authorized_keys
+    ssh-keygen -i -m PKCS8 -f pubkey-9a-A.pem >> ~/.ssh/authorized_keys
 
-   # Configure SSH to use the PIV key via OpenSC PKCS#11
-   # In ~/.ssh/config:
-   #   Host *
-   #     PKCS11Provider /usr/lib64/opensc-pkcs11.so
+    # Configure SSH to use the PIV key via OpenSC PKCS#11
+    # In ~/.ssh/config:
+    #   Host *
+    #     PKCS11Provider /usr/lib64/opensc-pkcs11.so
 
-For YubiKey B, convert its public key and add to ``authorized_keys``:
+For YubiKey B, convert its public key and push it to the remote host:
 
 .. code:: bash
 
-   ssh-keygen -i -m PKCS8 -f pubkey-9a-B.pem | \
-     ssh <user>@<host> 'cat >> ~/.ssh/authorized_keys'
+    ssh-keygen -i -m PKCS8 -f pubkey-9a-B.pem | \
+      ssh <user>@<host> 'cat >> ~/.ssh/authorized_keys'
 
 **Step 9 - Generate CHUID and CCC (optional)**
 
 .. code:: bash
 
-   ykman piv objects generate CHUID
-   ykman piv objects generate CCC
+    ykman piv objects generate CHUID
+    ykman piv objects generate CCC
 
 **Step 10 - Verify**
 
 .. code:: bash
 
-   ykman piv info
-   # Should show: PIN/PUK tries, management key status, and slot info
+    ykman piv info
+    # Should show: PIN/PUK tries, management key status, and slot info
 
 3b. Recovery After Losing Device A
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Retrieve YubiKey B from safe location.
 2. Insert B and enter its PIN.
@@ -208,19 +221,15 @@ For YubiKey B, convert its public key and add to ``authorized_keys``:
 6. Remove A's public keys/certificates from all services.
 
 3c. Revocation
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
-Private keys on the lost YubiKey A cannot be deleted remotely.
-Mitigations:
+Private keys on the lost YubiKey A cannot be deleted remotely. Mitigations:
 
 1. **SSH**: Remove A's public key from all ``authorized_keys`` files.
-
 2. **Certificates**: If signed by an internal CA, publish a Certificate
    Revocation List (CRL) or use OCSP stapling for A's certificates.
-
 3. **Self-signed certs**: Manually replace trust anchors everywhere A's
    certificate was imported.
-
 4. **Management key**: If A is later recovered physically, you can do a
    full PIV reset:
 
@@ -229,7 +238,6 @@ Mitigations:
       ykman piv reset
 
    This wipes all keys and certificates and restores factory PIN/PUK.
-
 5. **Attestation**: Use attestation certs to prove B's keys were
    generated on a YubiKey (not copied):
 
@@ -237,26 +245,30 @@ Mitigations:
 
       ykman piv keys attest 9a attest-9a-B.pem
 
-Attestation
------------
+3d. Notes
+~~~~~~~~~
 
-PIV attestation proves a key was generated on the YubiKey (not
-imported). It requires the attestation key, which is present on YubiKeys
-manufactured after 2020.
+- **Attestation** proves a key was generated on the YubiKey (not
+  imported). It requires the attestation key, present on YubiKeys
+  manufactured after 2020. Back up the attestation certificate:
 
-.. code:: bash
+  .. code:: bash
 
-   # Generate attestation certificate for slot 9a
-   ykman piv keys attest 9a /path/to/backup/attest-9a-A.pem
+     ykman piv keys attest 9a /path/to/backup/attest-9a-A.pem
 
-Attestation certificates can be verified against Yubico's public CA.
+  Attestation certificates can be verified against Yubico's public CA.
+- **Pin policy / touch policy** differ per slot — a touch-only slot (9e)
+  is faster but less secure; a PIN-required slot (9a/9c/9d) is safer.
+- **The stub only remembers the last key written.** Your GPG/SSH keyring
+  remembers one serial at a time; switch with the appropriate refresh
+  command when swapping A for B.
 
-Data to Back Up
----------------
+4. Backup
+---------
 
-- PIN, PUK (store in encrypted password manager)
-- Public keys for all slots on both keys (for easy recovery, add to
-  services)
-- Attestation certificates (for proof of hardware generation)
+- PIN, PUK (store in an encrypted password manager)
+- Public keys for all slots on both keys (add to services for easy
+  recovery)
+- Attestation certificates (proof of hardware generation)
 - Any CSRs / CA-signed certificates
 - Management key (if not using PIN-protected storage)

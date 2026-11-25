@@ -6,11 +6,11 @@ YubiHSM Auth
 
 YubiHSM Auth is a YubiKey application that stores credentials for
 authenticating to a YubiHSM 2 hardware security module. The YubiKey
-serves as a “key to the HSM” — you touch the YubiKey to authorize
+serves as a "key to the HSM" — you touch the YubiKey to authorize
 operations on the YubiHSM.
 
 1a. What It Is Used For
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **YubiHSM 2 authentication** - the primary and intended use case.
 - **Asymmetric credential storage** - generate and store Ed25519 or ECC
@@ -40,21 +40,21 @@ enabled by default on new YubiKeys.
 |                       |                       | HSM authentication.   |
 +-----------------------+-----------------------+-----------------------+
 
-3. Setup for Two-Device Use Case
+3. Setup for the Two-Device Case
 --------------------------------
 
 Both YubiKeys should store the **same** credentials so either can
 authenticate to the YubiHSM.
 
 3a. Full Setup From Scratch
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Step 1 - Set management key**
 
 .. code:: bash
 
-   # Change the management key password
-   ykman hsmauth access change-management-password
+    # Change the management key password
+    ykman hsmauth access change-management-password
 
 Use the **same password** on both keys. Store in encrypted backup.
 
@@ -64,38 +64,38 @@ Symmetric credential (derived from password):
 
 .. code:: bash
 
-   ykman hsmauth credentials derive "my-hsm-cred" --password <PASSWORD>
+    ykman hsmauth credentials derive "my-hsm-cred" --password <PASSWORD>
 
 Asymmetric credential (generate on-device):
 
 .. code:: bash
 
-   ykman hsmauth credentials generate "my-asym-cred" --algorithm ECCP256
+    ykman hsmauth credentials generate "my-asym-cred" --algorithm ECCP256
 
 Symmetric credential (import existing key):
 
 .. code:: bash
 
-   ykman hsmauth credentials symmetric "my-sym-cred" --key HEXKEY
+    ykman hsmauth credentials symmetric "my-sym-cred" --key HEXKEY
 
 **Step 3 - Repeat on YubiKey B**
 
 .. code:: bash
 
-   # For derived/symmetric: use the same password/key
-   ykman -d <B-SERIAL> hsmauth credentials derive "my-hsm-cred" --password <PASSWORD>
+    # For derived/symmetric: use the same password/key
+    ykman -d <B-SERIAL> hsmauth credentials derive "my-hsm-cred" --password <PASSWORD>
 
-   # For asymmetric: generate is unique per device (cannot be duplicated)
-   ykman -d <B-SERIAL> hsmauth credentials generate "my-asym-cred" --algorithm ECCP256
+    # For asymmetric: generate is unique per device (cannot be duplicated)
+    ykman -d <B-SERIAL> hsmauth credentials generate "my-asym-cred" --algorithm ECCP256
 
 **Step 4 - Verify**
 
 .. code:: bash
 
-   ykman hsmauth credentials list
+    ykman hsmauth credentials list
 
 3b. Recovery After Losing Device A
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Take YubiKey B from safe storage.
 2. For **symmetric/derived** credentials: B has the same shared secret —
@@ -106,29 +106,34 @@ Symmetric credential (import existing key):
 5. Remove A's public keys from the YubiHSM's allowed key list.
 
 3c. Revocation
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 Since credentials are standalone (no CA/issuer):
 
 1. **Symmetric**: Change the shared secret in the YubiHSM. Old
    credential on lost A is useless.
-
 2. **Asymmetric**: Remove A's public key from the HSM's authorized keys
    list.
-
 3. **YubiHSM Auth reset** (if you recover the key physically):
 
    .. code:: bash
 
       ykman hsmauth reset
 
-When to Disable
----------------
+3d. Notes
+~~~~~~~~~
 
-If you don't own a YubiHSM, disable HSMAuth to reduce attack surface and
-free up NFC/USB bandwidth:
+- **Asymmetric keys are not interchangeable.** Each key generates its
+  own unique key pair, so the YubiHSM must be told to trust B's public
+  key (or B won't authenticate). Back up B's public key while setup is
+  fresh.
+- **Symmetric credentials are shared**, so they just work on B with no
+  HSM reconfiguration — the simpler choice for a backup key.
 
-.. code:: bash
+4. Backup
+---------
 
-   ykman config usb --disable hsmauth
-   ykman config nfc --disable hsmauth
+- Management key password (same on both keys, encrypted storage)
+- Derived/symmetric credential material reference
+- Asymmetric public keys (so the HSM can be reconfigured to trust B)
+- Hex keys (for imported symmetric credentials)

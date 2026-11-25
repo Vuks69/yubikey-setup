@@ -1,6 +1,14 @@
 YubiKey Two-Device Setup Guide
 ==============================
 
+.. toctree::
+   :titlesonly:
+   :glob:
+   :maxdepth: 1
+   :caption: Contents:
+
+   *
+
 YubiKey A (daily driver) and YubiKey B (backup, safe location).
 
 **Hardware**: Two YubiKeys (5th gen or later recommended), here called A
