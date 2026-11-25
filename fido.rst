@@ -107,7 +107,7 @@ Register both keys.
    # Install pam-u2f + pamu2fcfg (package name varies: libpam-u2f, pam-u2f, etc.)
 
    # Add both keys to the authfile
-   pamu2fcfg -n > ~/.config/Yubico/u2f_keys
+   pamu2fcfg > ~/.config/Yubico/u2f_keys
    # Tap YubiKey A
    pamu2fcfg -n >> ~/.config/Yubico/u2f_keys
    # Insert YubiKey B, tap it
